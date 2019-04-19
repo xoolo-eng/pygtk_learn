@@ -10,17 +10,66 @@ from gi.repository import (
 from random import randint, sample
 from colors import color
 from threading import Lock
+from collections import namedtuple
+
+
+Coords = namedtuple("Coords", ["x", "y"])
+# class Coords():
+#     """."""
+#
+#     def __init__(self, x, y):
+#         """."""
+#         self.__x = x
+#         self.__y = y
+#
+#     def __getattr__(self, name):
+#         """Сделать в виде дескрипторов."""
+#         if name not in ["x", "y"]:
+#             raise AttributeError
+#         return self.__dict__[f"_Coords__{name}"]
+#
+#     def __iter__(self):
+#         """."""
+#         self.__result = self.__generator()
+#         return self
+#
+#     def __next__(self):
+#         """."""
+#         try:
+#             result = next(self.__result)
+#         except Exception:
+#             raise StopIteration
+#         else:
+#             return result
+#
+#     def __generator(self):
+#         yield self.__x
+#         yield self.__y
+
+
+class Bot():
+    """."""
+
+    def __init__(self, coords):
+        """."""
+        self.genom = list()
+        self.__init_genom()
+        self.x, self.y = coords
+
+    def __init_genom(self):
+        """."""
+        for i in range(64):
+            self.genom.append(randint(0, 63))
 
 
 class Canvas(Gtk.DrawingArea):
     """."""
 
-    SIZE_POINT = 10
+    SIZE_POINT = 5
     LINE_WIDTH = 0.1
 
-    def __init__(self):
+    def __init__(self, *args, **kwargs):
         """."""
-        self.init = False
         super(Canvas, self).__init__()
         self.data = list()
         self.width = 0
@@ -28,10 +77,15 @@ class Canvas(Gtk.DrawingArea):
         self.max_w = 0
         self.max_h = 0
         self.barriers_data = list()
+        self.food_data = list()
+        self.poison_data = list()
+        self.bots_data = list()
         self.use_colors = {
-            "background": "Green",
-            "barier": "Grey",
-            "bot": "DarkBlue"
+            "background": "LightGray",
+            "barier": "Gray",
+            "bot": "DarkBlue",
+            "food": "Green",
+            "poison": "DarkRed"
         }
         self.mutex = Lock()
         self.params = dict()
@@ -39,15 +93,20 @@ class Canvas(Gtk.DrawingArea):
 
     def on_draw(self, canvas, cr):
         """."""
-        cr.set_line_width(self.LINE_WIDTH)
-        self.__draw_area(cr)
-        self.__draw_bariers(cr)
         allocation = self.get_allocation()
         self.width = allocation.width // self.SIZE_POINT * self.SIZE_POINT
         self.height = allocation.height // self.SIZE_POINT * self.SIZE_POINT
         self.max_w = self.width // self.SIZE_POINT
         self.max_h = self.height // self.SIZE_POINT
-        self.__create_bariers(5, 20)
+        if self.params.get("draw"):
+            cr.set_line_width(self.LINE_WIDTH)
+            self.__draw_area(cr)
+            self.__draw_bariers(cr)
+            self.__draw_food(cr)
+        else:
+            self.__create_bariers(5, 50)
+            self.__create_food(200)
+            self.params["draw"] = True
 
     def __draw_area(self, cr):
         """."""
@@ -61,10 +120,6 @@ class Canvas(Gtk.DrawingArea):
             for y in range(
                     0, self.height,
                     self.SIZE_POINT):
-                cr.move_to(
-                    x+self.LINE_WIDTH,
-                    y+self.LINE_WIDTH
-                )
                 cr.rectangle(
                     x+self.LINE_WIDTH,
                     y+self.LINE_WIDTH,
@@ -82,70 +137,79 @@ class Canvas(Gtk.DrawingArea):
         directions = list()
         for i in range(count):
             directions.append([
-                tuple([start_x[i], start_y[i]-1]),
-                tuple([start_x[i]+1, start_y[i]]),
-                tuple([start_x[i], start_y[i]+1]),
-                tuple([start_x[i]-1, start_y[i]])
+                Coords(start_x[i], start_y[i]-1),
+                Coords(start_x[i]+1, start_y[i]),
+                Coords(start_x[i], start_y[i]+1),
+                Coords(start_x[i]-1, start_y[i])
             ])
-        # print(directions)
         self.barriers_data = list()
+        bariers = list()
         self.mutex.acquire()
         try:
             for i in range(count):
-                self.barriers_data.append({tuple([start_x[i], start_y[i]])})
+                bariers.append(Coords(start_x[i], start_y[i]))
+                self.barriers_data.append(Coords(start_x[i], start_y[i]))
             for i in range(count):
-                print(i)
                 for j in range(length-1):
                     direction = randint(0, 3)
-                    print(direction, list(self.barriers_data[i])[-1])
                     new_x, new_y = directions[i][direction]
-                    curent_x, curent_y = list(self.barriers_data[i])[-1]
+                    curent_x, curent_y = bariers[i]
                     if not (0 <= new_x < self.max_w):
                         new_x = curent_x
                     if not (0 <= new_y < self.max_h):
                         new_y = curent_y
-                    self.barriers_data[i].add(tuple([new_x, new_y]))
+                    bariers[i] = (Coords(new_x, new_y))
                     if direction == 0:
-                        directions[i][0] = tuple([new_x, new_y-1])
+                        directions[i][0] = Coords(new_x, new_y-1)
                     elif direction == 1:
-                        directions[i][1] = tuple([new_x+1, new_y])
+                        directions[i][1] = Coords(new_x+1, new_y)
                     elif direction == 2:
-                        directions[i][2] = tuple([new_x, new_y+1])
+                        directions[i][2] = Coords(new_x, new_y+1)
                     elif direction == 3:
-                        directions[i][3] = tuple([new_x-1, new_y])
+                        directions[i][3] = Coords(new_x-1, new_y)
+                    self.barriers_data.append(Coords(new_x, new_y))
         finally:
             self.mutex.release()
-        print(self.barriers_data)
 
     def __draw_bariers(self, cr):
         """."""
         cr.save()
-        for barier_coords in self.barriers_data:
-            for coords in list(barier_coords):
-                self.__rectangle(cr, coords, self.use_colors["barier"])
+        for coords in self.barriers_data:
+            self.__rectangle(cr, coords, self.use_colors["barier"])
+        cr.restore()
+
+    def __create_food(self, count):
+        """."""
+        self.food_data = list()
+        for i in range(count):
+            while True:
+                coords = Coords(randint(0, self.max_w-1), randint(0, self.max_h-1))
+                if coords not in self.barriers_data:
+                    self.food_data.append(coords)
+                    break
+
+    def __draw_food(self, cr):
+        """."""
+        cr.save()
+        for coords in self.food_data:
+            self.__rectangle(cr, coords, self.use_colors["food"])
         cr.restore()
 
     def __rectangle(self, cr, coords, color_name):
         """."""
         cr.save()
         cr.set_source_rgb(*color(color_name))
-        cr.move_to(
-            (coords[0]*self.SIZE_POINT),
-            (coords[1]*self.SIZE_POINT)
-        )
         cr.rectangle(
-            (coords[0]*self.SIZE_POINT),
-            (coords[1]*self.SIZE_POINT),
-            self.SIZE_POINT,
-            self.SIZE_POINT
+            (coords.x * self.SIZE_POINT) + self.LINE_WIDTH,
+            (coords.y * self.SIZE_POINT) + self.LINE_WIDTH,
+            self.SIZE_POINT - self.LINE_WIDTH,
+            self.SIZE_POINT - self.LINE_WIDTH
         )
         cr.fill()
         cr.restore()
 
     def set_data(self, data=[]):
         """."""
-        self.params = dict()
-        self.params["clean"] = True
         self.data = data
         self.queue_draw()
 
@@ -178,12 +242,16 @@ class DrawingWindow(Gtk.Window):
         right_box.set_size_request(150, -1)
         box_master.add(right_box)
 
+        separator = Gtk.HSeparator()
+        right_box.pack_start(separator, False, True, 10)
+
         execute_button = Gtk.Button("Start")
         execute_button.connect("clicked", self.on_execute)
         right_box.pack_start(execute_button, False, True, 0)
 
         separator = Gtk.HSeparator()
         right_box.pack_start(separator, False, True, 10)
+
         label = Gtk.Label("Count bots")
         right_box.pack_start(label, False, True, 0)
         self.count_bots_entry = Gtk.Entry()
@@ -227,6 +295,9 @@ class DrawingWindow(Gtk.Window):
 
         button_box = Gtk.ButtonBox()
         right_box.pack_start(button_box, False, True, 0)
+
+        separator = Gtk.HSeparator()
+        right_box.pack_start(separator, False, True, 10)
 
         self.apply_energy_button = Gtk.Button("Apply")
         self.apply_energy_button.set_sensitive(False)
