@@ -7,44 +7,13 @@ from gi.repository import (
     # GLib,
     # Gdk
 )
-from random import randint, sample
+from random import randint, sample, choice
 from colors import color
 from threading import Lock
 from collections import namedtuple
 
 
 Coords = namedtuple("Coords", ["x", "y"])
-# class Coords():
-#     """."""
-#
-#     def __init__(self, x, y):
-#         """."""
-#         self.__x = x
-#         self.__y = y
-#
-#     def __getattr__(self, name):
-#         """Сделать в виде дескрипторов."""
-#         if name not in ["x", "y"]:
-#             raise AttributeError
-#         return self.__dict__[f"_Coords__{name}"]
-#
-#     def __iter__(self):
-#         """."""
-#         self.__result = self.__generator()
-#         return self
-#
-#     def __next__(self):
-#         """."""
-#         try:
-#             result = next(self.__result)
-#         except Exception:
-#             raise StopIteration
-#         else:
-#             return result
-#
-#     def __generator(self):
-#         yield self.__x
-#         yield self.__y
 
 
 class Bot():
@@ -62,24 +31,136 @@ class Bot():
             self.genom.append(randint(0, 63))
 
 
+class WorkPlace():
+
+    def __init__(self, **kwargs):
+        self.size_point = kwargs.get("size_point", 5)
+        self.width_line = kwargs.get("width_line", 0.1)
+        self.count_bariers = kwargs.get("conut_bariers", 5)
+        self.maxlen_barier = kwargs.get("maxlen_barier", 50)
+        self.count_food = kwargs.get("count_food", 50)
+        self.persent_poison = kwargs.get("persent_poison", 20)
+        self.__barriers_data = list()
+        self.__food_data = list()
+        self.__poison_data = list()
+        self.reload = True
+
+    def get_bariers(self, *args):
+        if self.reload:
+            max_x, max_y = args
+            start_x = sample(range(max_x), self.count_bariers)
+            start_y = sample(range(max_y), self.count_bariers)
+            directions = list()
+            for i in range(self.count_bariers):
+                directions.append([
+                    Coords(start_x[i], start_y[i]-1),
+                    Coords(start_x[i]+1, start_y[i]),
+                    Coords(start_x[i], start_y[i]+1),
+                    Coords(start_x[i]-1, start_y[i])
+                ])
+            self.__barriers_data = list()
+            bariers = list()
+            for i in range(self.count_bariers):
+                bariers.append(Coords(start_x[i], start_y[i]))
+                self.__barriers_data.append(Coords(start_x[i], start_y[i]))
+            for i in range(self.count_bariers):
+                old_direction = randint(0, 3)
+                for j in range(self.maxlen_barier-1):
+                    direction = randint(0, 9)
+                    if direction > old_direction:
+                        direction = old_direction
+                    old_direction = direction
+                    new_x, new_y = directions[i][direction]
+                    curent_x, curent_y = bariers[i]
+                    if not (0 <= new_x < max_x):
+                        new_x = curent_x
+                    if not (0 <= new_y < max_y):
+                        new_y = curent_y
+                    bariers[i] = (Coords(new_x, new_y))
+                    if direction == 0:
+                        directions[i][0] = Coords(new_x, new_y-1)
+                        directions[i][1] = Coords(new_x+1, new_y)
+                        directions[i][3] = Coords(new_x-1, new_y)
+                    elif direction == 1:
+                        directions[i][0] = Coords(new_x, new_y-1)
+                        directions[i][1] = Coords(new_x+1, new_y)
+                        directions[i][2] = Coords(new_x, new_y+1)
+                    elif direction == 2:
+                        directions[i][1] = Coords(new_x+1, new_y)
+                        directions[i][2] = Coords(new_x, new_y+1)
+                        directions[i][3] = Coords(new_x-1, new_y)
+                    elif direction == 3:
+                        directions[i][0] = Coords(new_x, new_y-1)
+                        directions[i][2] = Coords(new_x, new_y+1)
+                        directions[i][3] = Coords(new_x-1, new_y)
+                    self.__barriers_data.append(Coords(new_x, new_y))
+            if self.__barriers_data and self.__food_data and self.__poison_data:
+                self.reload = False
+        return self.__barriers_data
+
+    def get_food(self, *args):
+        if self.reload:
+            max_x, max_y = args
+            self.__food_data = list()
+            for _ in range(self.count_food):
+                while True:
+                    coords = Coords(
+                        randint(0, max_x-1),
+                        randint(0, max_y-1)
+                    )
+                    if coords not in self.__barriers_data:
+                        self.__food_data.append(coords)
+                        break
+            if self.__barriers_data and self.__food_data and self.__poison_data:
+                self.reload = False
+        return self.__food_data
+
+    def get_poison(self):
+        if self.reload:
+            self.__poison_data = list()
+            count = int(len(self.__food_data) / 100 * self.persent_poison)
+            for i in range(count):
+                while True:
+                    element = choice(self.__food_data)
+                    if element not in self.__poison_data:
+                        self.__poison_data.append(element)
+                        break
+            if self.__barriers_data and self.__food_data and self.__poison_data:
+                self.reload = False
+        return self.__poison_data
+
+    def set_reload(self):
+        self.__barriers_data = list()
+        self.__food_data = list()
+        self.__poison_data = list()
+        self.reload = True
+
+
 class Canvas(Gtk.DrawingArea):
     """."""
 
-    SIZE_POINT = 5
-    LINE_WIDTH = 0.1
+    SIZE_POINT = 10  #
+    LINE_WIDTH = 0.1  #
 
     def __init__(self, *args, **kwargs):
         """."""
         super(Canvas, self).__init__()
         self.data = list()
-        self.width = 0
-        self.height = 0
-        self.max_w = 0
-        self.max_h = 0
-        self.barriers_data = list()
-        self.food_data = list()
-        self.poison_data = list()
-        self.bots_data = list()
+        # ###
+        # allocation = self.get_allocation()
+        # self.width = allocation.width // self.SIZE_POINT * self.SIZE_POINT
+        # self.height = allocation.height // self.SIZE_POINT * self.SIZE_POINT
+        # self.max_w = self.width // self.SIZE_POINT
+        # self.max_h = self.height // self.SIZE_POINT
+        # ###
+        self.work_place = WorkPlace(
+            size_point=self.SIZE_POINT,
+            width_line=self.LINE_WIDTH
+        )
+        # self.barriers_data = self.work_place.get_bariers(self.max_w, self.max_h)
+        # self.food_data = self.work_place.get_food(self.max_w, self.max_h)
+        # self.poison_data = self.work_place.get_poison()
+        # self.bots_data = list()
         self.use_colors = {
             "background": "LightGray",
             "barier": "Gray",
@@ -98,15 +179,19 @@ class Canvas(Gtk.DrawingArea):
         self.height = allocation.height // self.SIZE_POINT * self.SIZE_POINT
         self.max_w = self.width // self.SIZE_POINT
         self.max_h = self.height // self.SIZE_POINT
-        if self.params.get("draw"):
-            cr.set_line_width(self.LINE_WIDTH)
-            self.__draw_area(cr)
-            self.__draw_bariers(cr)
-            self.__draw_food(cr)
-        else:
-            self.__create_bariers(5, 50)
-            self.__create_food(200)
-            self.params["draw"] = True
+        self.barriers_data = self.work_place.get_bariers(
+            self.max_w, self.max_h
+        )
+        self.food_data = self.work_place.get_food(
+            self.max_w, self.max_h
+        )
+        self.poison_data = self.work_place.get_poison()
+        self.bots_data = list()
+
+        cr.set_line_width(self.LINE_WIDTH)
+        self.__draw_area(cr)
+        self.__draw_barriers(cr)
+        self.__draw_food(cr)
 
     def __draw_area(self, cr):
         """."""
@@ -130,69 +215,21 @@ class Canvas(Gtk.DrawingArea):
         cr.fill()
         cr.restore()
 
-    def __create_bariers(self, count, length):
-        """."""
-        start_x = sample(range(self.max_w), count)
-        start_y = sample(range(self.max_h), count)
-        directions = list()
-        for i in range(count):
-            directions.append([
-                Coords(start_x[i], start_y[i]-1),
-                Coords(start_x[i]+1, start_y[i]),
-                Coords(start_x[i], start_y[i]+1),
-                Coords(start_x[i]-1, start_y[i])
-            ])
-        self.barriers_data = list()
-        bariers = list()
-        self.mutex.acquire()
-        try:
-            for i in range(count):
-                bariers.append(Coords(start_x[i], start_y[i]))
-                self.barriers_data.append(Coords(start_x[i], start_y[i]))
-            for i in range(count):
-                for j in range(length-1):
-                    direction = randint(0, 3)
-                    new_x, new_y = directions[i][direction]
-                    curent_x, curent_y = bariers[i]
-                    if not (0 <= new_x < self.max_w):
-                        new_x = curent_x
-                    if not (0 <= new_y < self.max_h):
-                        new_y = curent_y
-                    bariers[i] = (Coords(new_x, new_y))
-                    if direction == 0:
-                        directions[i][0] = Coords(new_x, new_y-1)
-                    elif direction == 1:
-                        directions[i][1] = Coords(new_x+1, new_y)
-                    elif direction == 2:
-                        directions[i][2] = Coords(new_x, new_y+1)
-                    elif direction == 3:
-                        directions[i][3] = Coords(new_x-1, new_y)
-                    self.barriers_data.append(Coords(new_x, new_y))
-        finally:
-            self.mutex.release()
-
-    def __draw_bariers(self, cr):
+    def __draw_barriers(self, cr):
         """."""
         cr.save()
         for coords in self.barriers_data:
             self.__rectangle(cr, coords, self.use_colors["barier"])
         cr.restore()
 
-    def __create_food(self, count):
-        """."""
-        self.food_data = list()
-        for i in range(count):
-            while True:
-                coords = Coords(randint(0, self.max_w-1), randint(0, self.max_h-1))
-                if coords not in self.barriers_data:
-                    self.food_data.append(coords)
-                    break
-
     def __draw_food(self, cr):
         """."""
         cr.save()
         for coords in self.food_data:
-            self.__rectangle(cr, coords, self.use_colors["food"])
+            if coords not in self.poison_data:
+                self.__rectangle(cr, coords, self.use_colors["food"])
+            else:
+                self.__rectangle(cr, coords, self.use_colors["poison"])
         cr.restore()
 
     def __rectangle(self, cr, coords, color_name):
@@ -208,9 +245,10 @@ class Canvas(Gtk.DrawingArea):
         cr.fill()
         cr.restore()
 
-    def set_data(self, data=[]):
+    def set_data(self, data):
         """."""
-        self.data = data
+        if data:
+            self.work_place.set_reload()
         self.queue_draw()
 
 
@@ -225,9 +263,9 @@ class DrawingWindow(Gtk.Window):
 
     def __create_interface(self):
         """Create interface."""
-        self.set_size_request(600, 400)
         self.maximize()
         self.set_position(Gtk.WindowPosition.CENTER)
+
         box_master = Gtk.Box()
         box_master.set_border_width(5)
         self.add(box_master)
@@ -308,13 +346,20 @@ class DrawingWindow(Gtk.Window):
         close_button.connect("clicked", Gtk.main_quit)
         button_box.add(close_button)
 
+        self.scroll_box = Gtk.ScrolledWindow()
+        self.scroll_box.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.NEVER)
+        left_box.pack_start(self.scroll_box, True, True, 0)
+
         self.canvas = Canvas()
-        left_box.pack_start(self.canvas, True, True, 0)
+        self.scroll_box.add(self.canvas)
+
+        allocation = self.get_allocation()
+        self.WIDTH = allocation.width
+        self.HEIGTH = allocation.height
 
     def on_execute(self, button):
         """Run Imitation."""
-        print("on_execute()")
-        self.canvas.set_data([])
+        self.canvas.set_data(False)
 
     def on_changed_energy(self, spin):
         """Change lavel energy."""
@@ -322,13 +367,12 @@ class DrawingWindow(Gtk.Window):
             self.apply_energy_button.set_sensitive(False)
         else:
             self.apply_energy_button.set_sensitive(True)
-        print(spin.get_value_as_int())
 
     def on_apply_energy(self, widget):
         """Apply energy."""
         self.energy = self.energy_s_button.get_value_as_int()
         widget.set_sensitive(False)
-        print("Apply energy")
+        self.canvas.set_data(True)
 
 
 if __name__ == '__main__':
