@@ -1,4 +1,4 @@
-"""Generation app."""
+"""Canvas."""
 import gi
 gi.require_version("Gtk", "3.0")
 from gi.repository import (
@@ -9,26 +9,11 @@ from gi.repository import (
 )
 from random import randint, sample, choice
 from colors import color
-from threading import Lock
 from collections import namedtuple
+from threading import Lock
 
 
 Coords = namedtuple("Coords", ["x", "y"])
-
-
-class Bot():
-    """."""
-
-    def __init__(self, coords):
-        """."""
-        self.genom = list()
-        self.__init_genom()
-        self.x, self.y = coords
-
-    def __init_genom(self):
-        """."""
-        for i in range(64):
-            self.genom.append(randint(0, 63))
 
 
 class WorkPlace():
@@ -137,33 +122,21 @@ class WorkPlace():
 
 
 class Canvas(Gtk.DrawingArea):
-    """."""
 
     SIZE_POINT = 10  #
-    LINE_WIDTH = 0.1  #
+    WIDTH_LINE = 0.1  #
 
-    def __init__(self, *args, **kwargs):
-        """."""
+    def __init__(self, **kwargs):
         super(Canvas, self).__init__()
         self.data = list()
-        # ###
-        # allocation = self.get_allocation()
-        # self.width = allocation.width // self.SIZE_POINT * self.SIZE_POINT
-        # self.height = allocation.height // self.SIZE_POINT * self.SIZE_POINT
-        # self.max_w = self.width // self.SIZE_POINT
-        # self.max_h = self.height // self.SIZE_POINT
-        # ###
         self.work_place = WorkPlace(
-            size_point=self.SIZE_POINT,
-            width_line=self.LINE_WIDTH
+            size_point=kwargs.get("size_point", self.SIZE_POINT),
+            width_line=kwargs.get("width_line", self.WIDTH_LINE),
+            count_food=kwargs.get("energy", 0)
         )
-        # self.barriers_data = self.work_place.get_bariers(self.max_w, self.max_h)
-        # self.food_data = self.work_place.get_food(self.max_w, self.max_h)
-        # self.poison_data = self.work_place.get_poison()
-        # self.bots_data = list()
         self.use_colors = {
             "background": "LightGray",
-            "barier": "Gray",
+            "barier": "DarkGray",
             "bot": "DarkBlue",
             "food": "Green",
             "poison": "DarkRed"
@@ -173,7 +146,6 @@ class Canvas(Gtk.DrawingArea):
         self.connect("draw", self.on_draw)
 
     def on_draw(self, canvas, cr):
-        """."""
         allocation = self.get_allocation()
         self.width = allocation.width // self.SIZE_POINT * self.SIZE_POINT
         self.height = allocation.height // self.SIZE_POINT * self.SIZE_POINT
@@ -188,13 +160,12 @@ class Canvas(Gtk.DrawingArea):
         self.poison_data = self.work_place.get_poison()
         self.bots_data = list()
 
-        cr.set_line_width(self.LINE_WIDTH)
+        cr.set_line_width(self.WIDTH_LINE)
         self.__draw_area(cr)
         self.__draw_barriers(cr)
         self.__draw_food(cr)
 
     def __draw_area(self, cr):
-        """."""
         cr.save()
         cr.set_source_rgb(*color("White"))
         cr.rectangle(0, 0, self.width, self.height)
@@ -206,24 +177,22 @@ class Canvas(Gtk.DrawingArea):
                     0, self.height,
                     self.SIZE_POINT):
                 cr.rectangle(
-                    x+self.LINE_WIDTH,
-                    y+self.LINE_WIDTH,
-                    self.SIZE_POINT-self.LINE_WIDTH,
-                    self.SIZE_POINT-self.LINE_WIDTH
+                    x+self.WIDTH_LINE,
+                    y+self.WIDTH_LINE,
+                    self.SIZE_POINT-self.WIDTH_LINE,
+                    self.SIZE_POINT-self.WIDTH_LINE
                 )
         cr.set_source_rgb(*color(self.use_colors["background"]))
         cr.fill()
         cr.restore()
 
     def __draw_barriers(self, cr):
-        """."""
         cr.save()
         for coords in self.barriers_data:
             self.__rectangle(cr, coords, self.use_colors["barier"])
         cr.restore()
 
     def __draw_food(self, cr):
-        """."""
         cr.save()
         for coords in self.food_data:
             if coords not in self.poison_data:
@@ -233,150 +202,18 @@ class Canvas(Gtk.DrawingArea):
         cr.restore()
 
     def __rectangle(self, cr, coords, color_name):
-        """."""
         cr.save()
         cr.set_source_rgb(*color(color_name))
         cr.rectangle(
-            (coords.x * self.SIZE_POINT) + self.LINE_WIDTH,
-            (coords.y * self.SIZE_POINT) + self.LINE_WIDTH,
-            self.SIZE_POINT - self.LINE_WIDTH,
-            self.SIZE_POINT - self.LINE_WIDTH
+            (coords.x * self.SIZE_POINT) + self.WIDTH_LINE,
+            (coords.y * self.SIZE_POINT) + self.WIDTH_LINE,
+            self.SIZE_POINT - self.WIDTH_LINE,
+            self.SIZE_POINT - self.WIDTH_LINE
         )
         cr.fill()
         cr.restore()
 
     def set_data(self, data):
-        """."""
         if data:
             self.work_place.set_reload()
         self.queue_draw()
-
-
-class DrawingWindow(Gtk.Window):
-    """."""
-
-    def __init__(self):
-        """."""
-        super(Gtk.Window, self).__init__(title="DrawingArea")
-        self.__create_interface()
-        self.energy = 0
-
-    def __create_interface(self):
-        """Create interface."""
-        self.maximize()
-        self.set_position(Gtk.WindowPosition.CENTER)
-
-        box_master = Gtk.Box()
-        box_master.set_border_width(5)
-        self.add(box_master)
-
-        left_box = Gtk.Box()
-        box_master.pack_start(left_box, True, True, 0)
-
-        separator = Gtk.VSeparator()
-        box_master.pack_start(separator, False, False, 5)
-
-        right_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
-        right_box.set_size_request(150, -1)
-        box_master.add(right_box)
-
-        separator = Gtk.HSeparator()
-        right_box.pack_start(separator, False, True, 10)
-
-        execute_button = Gtk.Button("Start")
-        execute_button.connect("clicked", self.on_execute)
-        right_box.pack_start(execute_button, False, True, 0)
-
-        separator = Gtk.HSeparator()
-        right_box.pack_start(separator, False, True, 10)
-
-        label = Gtk.Label("Count bots")
-        right_box.pack_start(label, False, True, 0)
-        self.count_bots_entry = Gtk.Entry()
-        self.count_bots_entry.set_text(str(0))
-        self.count_bots_entry.set_editable(False)
-        right_box.pack_start(self.count_bots_entry, False, True, 0)
-
-        label = Gtk.Label("Generation")
-        right_box.pack_start(label, False, True, 0)
-        self.generation_entry = Gtk.Entry()
-        self.generation_entry.set_text(str(0))
-        self.generation_entry.set_editable(False)
-        right_box.pack_start(self.generation_entry, False, True, 0)
-
-        label = Gtk.Label("Mutatuins")
-        right_box.pack_start(label, False, True, 0)
-        self.mutation_entry = Gtk.Entry()
-        self.mutation_entry.set_text(str(0))
-        self.mutation_entry.set_editable(False)
-        right_box.pack_start(self.mutation_entry, False, True, 0)
-
-        separator = Gtk.HSeparator()
-        right_box.pack_start(separator, False, True, 10)
-
-        space = Gtk.Alignment()
-        right_box.pack_start(space, True, True, 0)
-
-        separator = Gtk.HSeparator()
-        right_box.pack_start(separator, False, True, 10)
-
-        label = Gtk.Label("Energy")
-        right_box.pack_start(label, False, True, 0)
-        self.energy_s_button = Gtk.SpinButton()
-        adjuctment = Gtk.Adjustment(0.0, 0.0, 1000.0, 10.0, 50.0, 0.0)
-        self.energy_s_button.set_adjustment(adjuctment)
-        self.energy_s_button.connect("changed", self.on_changed_energy)
-        right_box.pack_start(self.energy_s_button, False, True, 0)
-
-        separator = Gtk.HSeparator()
-        right_box.pack_start(separator, False, True, 10)
-
-        button_box = Gtk.ButtonBox()
-        right_box.pack_start(button_box, False, True, 0)
-
-        separator = Gtk.HSeparator()
-        right_box.pack_start(separator, False, True, 10)
-
-        self.apply_energy_button = Gtk.Button("Apply")
-        self.apply_energy_button.set_sensitive(False)
-        self.apply_energy_button.connect("clicked", self.on_apply_energy)
-        button_box.add(self.apply_energy_button)
-
-        close_button = Gtk.Button("Close")
-        close_button.connect("clicked", Gtk.main_quit)
-        button_box.add(close_button)
-
-        self.scroll_box = Gtk.ScrolledWindow()
-        self.scroll_box.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.NEVER)
-        left_box.pack_start(self.scroll_box, True, True, 0)
-
-        self.canvas = Canvas()
-        self.scroll_box.add(self.canvas)
-
-        allocation = self.get_allocation()
-        self.WIDTH = allocation.width
-        self.HEIGTH = allocation.height
-
-    def on_execute(self, button):
-        """Run Imitation."""
-        self.canvas.set_data(False)
-
-    def on_changed_energy(self, spin):
-        """Change lavel energy."""
-        if self.energy == spin.get_value_as_int():
-            self.apply_energy_button.set_sensitive(False)
-        else:
-            self.apply_energy_button.set_sensitive(True)
-
-    def on_apply_energy(self, widget):
-        """Apply energy."""
-        self.energy = self.energy_s_button.get_value_as_int()
-        widget.set_sensitive(False)
-        self.canvas.set_data(True)
-
-
-if __name__ == '__main__':
-    win = DrawingWindow()
-    win.connect("destroy", Gtk.main_quit)
-    win.show_all()
-    Gtk.main()
