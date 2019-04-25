@@ -1,19 +1,12 @@
 """Canvas."""
 import gi
 gi.require_version("Gtk", "3.0")
-from gi.repository import (
-    Gtk,
-    # Gio,
-    # GLib,
-    # Gdk
-)
+from gi.repository import Gtk
 from random import randint, sample, choice
 from colors import color
-from collections import namedtuple
 from threading import Lock
-
-
-Coords = namedtuple("Coords", ["x", "y"])
+from bots import Bot
+from tools import Coords, COUNT_BOTS
 
 
 class WorkPlace():
@@ -28,10 +21,19 @@ class WorkPlace():
         self.__barriers_data = list()
         self.__food_data = list()
         self.__poison_data = list()
-        self.reload = True
+        self.bots = list()
+
+    def create_bots(self, *args):
+        if not self.bots:
+            self.bots = [
+                Bot(
+                    new=True,
+                    coords=self.get_coords(*args)
+                ) for _ in range(COUNT_BOTS)
+            ]
 
     def get_bariers(self, *args):
-        if self.reload:
+        if not self.__barriers_data:
             max_x, max_y = args
             start_x = sample(range(max_x), self.count_bariers)
             start_y = sample(range(max_y), self.count_bariers)
@@ -79,12 +81,10 @@ class WorkPlace():
                         directions[i][2] = Coords(new_x, new_y+1)
                         directions[i][3] = Coords(new_x-1, new_y)
                     self.__barriers_data.append(Coords(new_x, new_y))
-            if self.__barriers_data and self.__food_data and self.__poison_data:
-                self.reload = False
         return self.__barriers_data
 
     def get_food(self, *args):
-        if self.reload:
+        if not self.__food_data:
             max_x, max_y = args
             self.__food_data = list()
             for _ in range(self.count_food):
@@ -96,12 +96,10 @@ class WorkPlace():
                     if coords not in self.__barriers_data:
                         self.__food_data.append(coords)
                         break
-            if self.__barriers_data and self.__food_data and self.__poison_data:
-                self.reload = False
         return self.__food_data
 
     def get_poison(self):
-        if self.reload:
+        if not self.__poison_data:
             self.__poison_data = list()
             count = int(len(self.__food_data) / 100 * self.persent_poison)
             for i in range(count):
@@ -110,15 +108,28 @@ class WorkPlace():
                     if element not in self.__poison_data:
                         self.__poison_data.append(element)
                         break
-            if self.__barriers_data and self.__food_data and self.__poison_data:
-                self.reload = False
         return self.__poison_data
 
     def set_reload(self):
         self.__barriers_data = list()
         self.__food_data = list()
-        self.__poison_data = list()
-        self.reload = True
+        self.__poison_data = list
+
+    def get_coords(self, *args):
+        while True:
+            coords = Coords(
+                randint(0, args[0]-1),
+                randint(0, args[1]-1)
+            )
+            if coords in self.__barriers_data:
+                continue
+            if coords in self.__food_data:
+                continue
+            return coords
+
+    def step(self):
+        for bot in self.bots:
+            bot.action()
 
 
 class Canvas(Gtk.DrawingArea):
@@ -142,28 +153,28 @@ class Canvas(Gtk.DrawingArea):
             "poison": "DarkRed"
         }
         self.mutex = Lock()
-        self.params = dict()
         self.connect("draw", self.on_draw)
 
     def on_draw(self, canvas, cr):
         allocation = self.get_allocation()
         self.width = allocation.width // self.SIZE_POINT * self.SIZE_POINT
         self.height = allocation.height // self.SIZE_POINT * self.SIZE_POINT
-        self.max_w = self.width // self.SIZE_POINT
-        self.max_h = self.height // self.SIZE_POINT
+        max_w = self.width // self.SIZE_POINT
+        max_h = self.height // self.SIZE_POINT
         self.barriers_data = self.work_place.get_bariers(
-            self.max_w, self.max_h
+            max_w, max_h
         )
         self.food_data = self.work_place.get_food(
-            self.max_w, self.max_h
+            max_w, max_h
         )
         self.poison_data = self.work_place.get_poison()
-        self.bots_data = list()
+        self.work_place.create_bots(max_w, max_h)
 
         cr.set_line_width(self.WIDTH_LINE)
         self.__draw_area(cr)
         self.__draw_barriers(cr)
         self.__draw_food(cr)
+        self.__draw_bots(cr)
 
     def __draw_area(self, cr):
         cr.save()
@@ -201,6 +212,13 @@ class Canvas(Gtk.DrawingArea):
                 self.__rectangle(cr, coords, self.use_colors["poison"])
         cr.restore()
 
+    def __draw_bots(self, cr):
+        cr.save()
+        for coords in self.data:
+            self.__rectangle(cr, coords, self.use_colors["bot"])
+        cr.restore()
+        self.work_place.step()
+
     def __rectangle(self, cr, coords, color_name):
         cr.save()
         cr.set_source_rgb(*color(color_name))
@@ -213,7 +231,6 @@ class Canvas(Gtk.DrawingArea):
         cr.fill()
         cr.restore()
 
-    def set_data(self, data):
-        if data:
-            self.work_place.set_reload()
+    def re_draw(self):
+        self.data = [bot.get_coords() for bot in self.work_place.bots]
         self.queue_draw()

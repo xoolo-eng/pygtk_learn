@@ -1,24 +1,16 @@
 """Generation app."""
 import gi
 gi.require_version("Gtk", "3.0")
-from gi.repository import (
-    Gtk,
-    # Gio,
-    # GLib,
-    # Gdk
-)
+from gi.repository import Gtk
 from canvas import Canvas
-from bots import Bot
 
 
 class DrawingWindow(Gtk.Window):
 
-    START_ENERGY = 200
-
     def __init__(self):
         super(Gtk.Window, self).__init__(title="DrawingArea")
+        self.energy = 200
         self.__create_interface()
-        self.energy = 0
 
     def __create_interface(self):
         self.maximize()
@@ -83,7 +75,7 @@ class DrawingWindow(Gtk.Window):
         self.energy_s_button = Gtk.SpinButton()
         adjuctment = Gtk.Adjustment(0.0, 0.0, 1000.0, 10.0, 50.0, 0.0)
         self.energy_s_button.set_adjustment(adjuctment)
-        self.energy_s_button.set_value(self.START_ENERGY)
+        self.energy_s_button.set_value(self.energy)
         self.energy_s_button.connect("changed", self.on_changed_energy)
         right_box.pack_start(self.energy_s_button, False, True, 0)
 
@@ -110,16 +102,12 @@ class DrawingWindow(Gtk.Window):
         left_box.pack_start(self.scroll_box, True, True, 0)
 
         self.canvas = Canvas(
-            energy=self.START_ENERGY
+            energy=self.energy
         )
         self.scroll_box.add(self.canvas)
 
-        allocation = self.get_allocation()
-        self.WIDTH = allocation.width
-        self.HEIGTH = allocation.height
-
     def on_execute(self, button):
-        self.canvas.set_data(False)
+        self.canvas.re_draw()
 
     def on_changed_energy(self, spin):
         if self.energy == spin.get_value_as_int():
