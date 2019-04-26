@@ -68,7 +68,7 @@ class Bot():
             return self.__energy()
 
     def __turn(self, directions):
-        pass
+        self.direction = directions[2]
 
     def __look(self, directions):
         pass
@@ -83,16 +83,13 @@ class Bot():
         else:
             return False
 
-    # def __hash__(self):
-    #     return hash(id(self))
-
     def __step(self):
         self.curent_bot = id(self)
         real_cursor = ((self.cursor % 8) + self.direction) % 8
         self.cursor += 1
-        action_direction = self.direction[real_cursor]
+        action_direction = self.directions[real_cursor]
         if 0 <= self.cursor < 16:
-            pass  # Выполнение завершающей команды
+            # Выполнение завершающей команды
             if 0 <= self.cursor < 8:
                 pass  # move
                 self.__move(action_direction[0])
@@ -101,14 +98,14 @@ class Bot():
 
             if 8 <= self.cursor < 16:
                 pass  # turn
-                self.__turm(action_direction[0])
+                self.__turn(action_direction[0])
                 if action_direction[1]:
-                    self.__turm(action_direction[1])
+                    self.__turn(action_direction[1])
 
             self.curent_bot = 0
             return
         if 16 <= self.cursor < 32:
-            pass  # Выполнение не завершающейго действия
+            # Выполнение не завершающейго действия
             if 16 <= self.cursor < 24:
                 pass  # look
                 self.__look(action_direction[0])
@@ -123,10 +120,10 @@ class Bot():
 
             return
         if 32 <= self.cursor < 64:
+            # Безусловный переход
             self.cursor = self.genom[self.cursor]
             self.curent_bot = 0
             return
-
 
     def action(self):
         if self.curent_bot:

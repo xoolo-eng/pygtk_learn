@@ -33,8 +33,9 @@ class DrawingWindow(Gtk.Window):
         separator = Gtk.HSeparator()
         right_box.pack_start(separator, False, True, 10)
 
-        execute_button = Gtk.Button("Start")
-        execute_button.connect("clicked", self.on_execute)
+        execute_button = Gtk.ToggleButton("Start")
+        execute_button.set_active(False)
+        execute_button.connect("toggled", self.on_execute)
         right_box.pack_start(execute_button, False, True, 0)
 
         separator = Gtk.HSeparator()
@@ -107,7 +108,12 @@ class DrawingWindow(Gtk.Window):
         self.scroll_box.add(self.canvas)
 
     def on_execute(self, button):
-        self.canvas.re_draw()
+        if button.get_active():
+            self.canvas.run()
+            button.set_label("Stop")
+        else:
+            self.canvas.stop()
+            button.set_label("Start")
 
     def on_changed_energy(self, spin):
         if self.energy == spin.get_value_as_int():

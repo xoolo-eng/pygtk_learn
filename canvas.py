@@ -7,6 +7,8 @@ from colors import color
 from threading import Lock
 from bots import Bot
 from tools import Coords, COUNT_BOTS
+from threading import Thread
+from time import sleep
 
 
 class WorkPlace():
@@ -154,6 +156,7 @@ class Canvas(Gtk.DrawingArea):
         }
         self.mutex = Lock()
         self.connect("draw", self.on_draw)
+        self.loop = True
 
     def on_draw(self, canvas, cr):
         allocation = self.get_allocation()
@@ -213,6 +216,7 @@ class Canvas(Gtk.DrawingArea):
         cr.restore()
 
     def __draw_bots(self, cr):
+        self.data = [bot.get_coords() for bot in self.work_place.bots]
         cr.save()
         for coords in self.data:
             self.__rectangle(cr, coords, self.use_colors["bot"])
@@ -231,6 +235,20 @@ class Canvas(Gtk.DrawingArea):
         cr.fill()
         cr.restore()
 
-    def re_draw(self):
-        self.data = [bot.get_coords() for bot in self.work_place.bots]
-        self.queue_draw()
+    def run(self):
+
+        def __go():
+            i = 0
+            while self.loop:
+                i += 1
+                # print("loop", i)
+                self.queue_draw()
+                # sleep(1)
+
+        loop = Thread(target=__go, args=[])
+        loop.start()
+        loop.join()
+
+    def stop(self):
+        print("stop")
+        self.loop = False
