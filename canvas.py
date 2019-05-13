@@ -7,8 +7,8 @@ from colors import color
 from threading import Lock
 from bots import Bot
 from tools import Coords, COUNT_BOTS
-from threading import Thread
-from time import sleep
+# from threading import Thread
+# from time import sleep
 
 
 class WorkPlace():
@@ -129,9 +129,9 @@ class WorkPlace():
                 continue
             return coords
 
-    def step(self):
+    def step(self, *args):
         for bot in self.bots:
-            bot.action()
+            bot.action(*args)
 
 
 class Canvas(Gtk.DrawingArea):
@@ -172,12 +172,12 @@ class Canvas(Gtk.DrawingArea):
         )
         self.poison_data = self.work_place.get_poison()
         self.work_place.create_bots(max_w, max_h)
-
         cr.set_line_width(self.WIDTH_LINE)
         self.__draw_area(cr)
         self.__draw_barriers(cr)
         self.__draw_food(cr)
         self.__draw_bots(cr)
+        return True
 
     def __draw_area(self, cr):
         cr.save()
@@ -221,7 +221,10 @@ class Canvas(Gtk.DrawingArea):
         for coords in self.data:
             self.__rectangle(cr, coords, self.use_colors["bot"])
         cr.restore()
-        self.work_place.step()
+        self.work_place.step(
+            self.width // self.SIZE_POINT,
+            self.height // self.SIZE_POINT
+        )
 
     def __rectangle(self, cr, coords, color_name):
         cr.save()
@@ -234,21 +237,3 @@ class Canvas(Gtk.DrawingArea):
         )
         cr.fill()
         cr.restore()
-
-    def run(self):
-
-        def __go():
-            i = 0
-            while self.loop:
-                i += 1
-                # print("loop", i)
-                self.queue_draw()
-                # sleep(1)
-
-        loop = Thread(target=__go, args=[])
-        loop.start()
-        loop.join()
-
-    def stop(self):
-        print("stop")
-        self.loop = False

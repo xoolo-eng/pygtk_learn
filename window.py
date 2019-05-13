@@ -1,7 +1,7 @@
 """Generation app."""
 import gi
 gi.require_version("Gtk", "3.0")
-from gi.repository import Gtk
+from gi.repository import Gtk, GLib
 from canvas import Canvas
 
 
@@ -109,10 +109,14 @@ class DrawingWindow(Gtk.Window):
 
     def on_execute(self, button):
         if button.get_active():
-            self.canvas.run()
+            # self.canvas.run()
+            # self.__timeout_id = GLib.timeout_add(10, self.on_start, self)
+            self.__timeout_id = GLib.timeout_add(100, self.on_start, self)
             button.set_label("Stop")
         else:
-            self.canvas.stop()
+            # self.canvas.stop()
+            GLib.source_remove(self.__timeout_id)
+            del self.__timeout_id
             button.set_label("Start")
 
     def on_changed_energy(self, spin):
@@ -125,3 +129,7 @@ class DrawingWindow(Gtk.Window):
         self.energy = self.energy_s_button.get_value_as_int()
         widget.set_sensitive(False)
         self.canvas.set_data(True)
+
+    def on_start(self, widget):
+        widget.canvas.queue_draw()
+        return True
